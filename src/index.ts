@@ -767,19 +767,36 @@ export function apply(ctx: Context, config: Config): void {
     poolAdapter?.invalidate()
     for (const [route, handle] of handles) handle.replace([route])
   }
+  let antigravityCatalogRefresh: AbortController | undefined
+  ctx.effect(() => () => { antigravityCatalogRefresh?.abort() }, 'subscriptions: Google auth catalog refresh')
   const authChanged = (provider: ProviderId, account?: string): void => {
     if (provider === 'codex' || provider === 'grok') imagePool.clear(provider, account)
     // Login, logout, and credential death all pass through here; a copilot
     // auth transition also drops the adapter's captured reasoning replay
     // state (isolation is already account-scoped — this is memory hygiene).
     if (provider === 'copilot') copilotAdapter?.clearReplayState()
-    adapters.get(provider)?.clearAccountCatalog(account)
+    const adapter = adapters.get(provider)
+    // The provider-level cache belongs to the default account. A login can
+    // change that owner, so rebuild both default and secondary Google caches.
+    adapter?.clearAccountCatalog(provider === 'antigravity' ? undefined : account)
     poolHealth?.clear(provider, account)
     poolUsage?.invalidate(provider, account)
     poolAdapter?.invalidate()
     // Pool membership follows the accounts: re-announce every route so the
     // picker re-queries (the changed provider's own catalog may shift too).
     for (const [route, handle] of handles) handle.replace([route])
+    if (provider === 'antigravity' && adapter !== undefined) {
+      antigravityCatalogRefresh?.abort()
+      const controller = new AbortController()
+      antigravityCatalogRefresh = controller
+      void withTimeout(signal => adapter.listOwnModels(
+        provider, undefined, AbortSignal.any([signal, controller.signal]),
+      ), DISCOVERY_TIMEOUT_MS).then(() => {
+        if (!controller.signal.aborted) catalogChanged()
+      }, error => {
+        if (!controller.signal.aborted) onWarn(`Google model refresh after account change failed: ${errorChain(error)}`)
+      })
+    }
   }
   // Per-model default effort overrides: start the load so the adapters'
   // synchronous `defaultEffortOf` callbacks see the persisted state as soon

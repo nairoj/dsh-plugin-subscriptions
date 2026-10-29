@@ -100,6 +100,8 @@ Open **Settings → Subscriptions → provider → Manage** to edit account alia
 
 ### Refreshing model lists
 
+Google Antigravity login, logout, and default-account changes immediately rebuild all logged-in Google accounts' model catalogs in the background and notify the model picker on completion. Discovery uses the configured `antigravity.userAgent`; account aliases, independent model entries, and visibility preferences are preserved. A newer account change or plugin unload cancels the preceding refresh.
+
 The model picker uses saved catalogs immediately, including catalogs for non-default accounts, without waiting for network discovery or starting a refresh on each open or selection. The plugin checks catalogs at startup, skips snapshots fetched within the last five minutes, then checks again 60 minutes after the previous check finishes. Failed checks retain saved models and wait for the next scheduled check. An account without any saved catalog still waits for its first discovery.
 
 In **Settings → Subscriptions → provider → Edit model list**, use **Refresh** to fetch the current catalog immediately and update the conversation model picker. Successful background updates also invalidate the picker cache. This is separate from subscription-usage and credential refresh, whose behavior is unchanged. If `models.<provider>` is explicitly configured with a non-empty list, that list still overrides discovery.
